@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.rajeev</groupId>
-	<artifactId>chat-server</artifactId>
+	<artifactId>chat_server</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>chat-server</name>
+	<name>chat_server</name>
 	<description>Spring Boot Chat server</description>
 	<url/>
 	<licenses>
