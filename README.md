@@ -2,6 +2,11 @@
 
 A cloud native chat server built using Java and other supporting technologies.
 
+## Core dependencies 
+- Java 17
+- Spring Boot 3.5.3
+
+
 ## Technologies Used
 
 - **Java**: Core programming language
