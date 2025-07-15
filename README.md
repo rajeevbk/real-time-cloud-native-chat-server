@@ -5,6 +5,8 @@ A cloud native chat server built using Java and other supporting technologies.
 ## Core dependencies 
 - Java 17
 - Spring Boot 3.5.3
+- Docker version 28.3.0, build 38b7060
+- Docker Compose version v2.38.1-desktop.1
 
 
 ## Technologies Used
@@ -21,14 +23,15 @@ A cloud native chat server built using Java and other supporting technologies.
 
 ## To Do
 
-- [ ] Initialize Spring Boot project structure
+- [x] Initialize Spring Boot project structure
+- [x] Containerize application dependencies
+- [ ] Create Interoperable Auth service that handles user federation (Will support Keycloak out of the box)
 - [ ] Set up Cassandra integration for message persistence
 - [ ] Implement WebSocket endpoints for real-time chat
 - [ ] Integrate Redis for caching and pub/sub
 - [ ] Add RabbitMQ for message queuing and delivery
 - [ ] Write REST APIs for user and chat management
 - [ ] Write Haskell scripts for message filtering, use in Spring service
-- [ ] Containerize the application using Docker
 - [ ] Create Kubernetes manifests for deployment
 - [ ] Add unit and integration tests
 - [ ] Write documentation for setup and usage
