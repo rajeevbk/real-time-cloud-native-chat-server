@@ -27,6 +27,26 @@ services:
     networks:
       - chat-server-network
 
+    # Keycloak Identity and Access Management - Just for development purposees
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.0
+    container_name: chat-server-keycloak
+    command: start-dev
+    ports:
+      - "8080:8080"
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_DB: mysql
+      KC_DB_URL: jdbc:mysql://mysql:3306/${KEYCLOAK_DB:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_USER:-keycloak_user}
+      KC_DB_PASSWORD: ${KEYCLOAK_PASSWORD:-keycloak_password123}
+    depends_on:
+      - mysql
+    networks:
+      - chat-server-network
+
+  
   # Redis Cache - Latest Stable
   redis:
     image: redis:7.2.3-alpine
