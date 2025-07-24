@@ -1,17 +1,19 @@
 package com.rajeev.chat_server.messaging.model;
 
-import com.icptechno.messaging.util.ThreadType;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+
 import org.springframework.data.annotation.Id;
 import org.springframework.data.redis.core.RedisHash;
+
+import com.rajeev.chat_server.util.ThreadType;
 
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Represents a conversation thread's metadata.

@@ -12,7 +12,7 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-class Participant implements Serializable {
+public class Participant implements Serializable {
     private String userId;
     private Instant joinedAt;
 }
