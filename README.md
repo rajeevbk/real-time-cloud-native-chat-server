@@ -1,3 +1,7 @@
+<img width="1703" height="615" alt="image" src="https://github.com/user-attachments/assets/bda96912-17aa-4172-a62e-7bfcc1c133db" />
+
+
+
 # real-time-cloud-native-chat-server
 
 A cloud native chat server built using Java and other supporting technologies.
