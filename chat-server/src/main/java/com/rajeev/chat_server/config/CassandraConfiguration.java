@@ -41,6 +41,13 @@ public class CassandraConfiguration extends AbstractCassandraConfiguration {
     @Value("${spring.data.cassandra.password}")
     private String password;
 
+    // Override the base package for entity scanning.
+    // This should match the package where your Cassandra entities are located.
+    @Override
+    public String[] getEntityBasePackages() {
+        return new String[]{"com.rajeev.chat_server.messaging.model"};
+    }
+
     /**
      * Specifies the keyspace name for the application to use.
      * @return The name of the keyspace.
