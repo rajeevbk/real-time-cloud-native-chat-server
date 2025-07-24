@@ -27,9 +27,9 @@ A cloud native chat server built using Java and other supporting technologies.
 - [x] Containerize application dependencies
 - [x] Connect with Keycloak for authentication delegation
 - [x] Add RabbitMQ for message queuing and delivery
-- [ ] Set up Cassandra integration for message persistence
-- [ ] Implement WebSocket endpoints for real-time chat
-- [ ] Integrate Redis for caching and pub/sub
+- [x] Set up Cassandra integration for message persistence
+- [x] Implement WebSocket endpoints for real-time chat
+- [x] Integrate Redis for caching and pub/sub
 - [ ] Write REST APIs for user and chat management
 - [ ] Write Haskell scripts for message filtering, use in Spring service
 - [ ] Create Kubernetes manifests for deployment
