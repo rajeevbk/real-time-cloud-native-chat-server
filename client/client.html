@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-User Chat Client</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- STOMP and SockJS Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .chat-panel { transition: all 0.3s ease-in-out; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4">
+        <header class="bg-white rounded-lg shadow p-4 mb-6 text-center">
+            <h1 class="text-2xl font-bold text-gray-700">Multi-User WebSocket Chat Client</h1>
+            <p class="text-sm text-gray-500 mt-1">Test your Spring Boot chat backend by simulating multiple users.</p>
+            <button id="addUserBtn" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                + Add User Session
+            </button>
+        </header>
+
+        <main id="chatArea" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Chat panels will be dynamically added here -->
+        </main>
+    </div>
+
+    <script>
+        const addUserBtn = document.getElementById('addUserBtn');
+        const chatArea = document.getElementById('chatArea');
+        const SOCKJS_URL = 'http://localhost:8081/ws-chat'; // Your server's SockJS endpoint
+        const clients = {}; // Store active client instances
+
+        // --- Event Listener to Add a New User ---
+        addUserBtn.addEventListener('click', () => {
+            const jwt = prompt("Please enter the JWT for the new user:");
+            if (jwt && jwt.trim() !== "") {
+                try {
+                    const decodedToken = decodeJwt(jwt);
+                    const username = decodedToken.preferred_username;
+
+                    if (!username) {
+                        alert("Could not find 'preferred_username' in the JWT payload.");
+                        return;
+                    }
+                    if (clients[username]) {
+                        alert(`A session for user '${username}' already exists.`);
+                        return;
+                    }
+
+                    createChatPanel(username, jwt);
+                } catch (error) {
+                    alert("Invalid JWT. Could not decode the token.");
+                    console.error("JWT Decode Error:", error);
+                }
+            }
+        });
+
+        // --- Core Functions ---
+
+        /**
+         * Decodes a JWT to extract the payload.
+         * Note: This does NOT validate the signature. It's for client-side convenience only.
+         */
+        function decodeJwt(token) {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        }
+
+        /**
+         * Creates the HTML structure and logic for a new user's chat panel.
+         */
+        function createChatPanel(username, jwt) {
+            const panelId = `panel-${username}`;
+            const panel = document.createElement('div');
+            panel.id = panelId;
+            panel.className = 'chat-panel bg-white rounded-lg shadow-lg p-4 flex flex-col h-96';
+            panel.innerHTML = `
+                <div class="flex justify-between items-center border-b pb-2 mb-2">
+                    <h2 class="text-lg font-bold">${username}</h2>
+                    <div class="flex items-center gap-2">
+                        <div id="status-${username}" class="w-4 h-4 rounded-full bg-yellow-400" title="Connecting..."></div>
+                        <button id="close-btn-${username}" class="text-red-500 hover:text-red-700 font-bold text-xl leading-none" title="Close Session">&times;</button>
+                    </div>
+                </div>
+                <div id="messages-${username}" class="flex-grow overflow-y-auto mb-2 pr-2"></div>
+                <div class="flex gap-2">
+                    <input id="recipient-${username}" type="text" placeholder="Recipient" class="w-1/3 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input id="message-input-${username}" type="text" placeholder="Type a message..." class="flex-grow p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <button id="send-btn-${username}" class="bg-green-500 hover:bg-green-600 text-white font-bold px-4 rounded-lg">Send</button>
+                </div>
+            `;
+            chatArea.appendChild(panel);
+
+            // Activate the STOMP client for this panel
+            connectClient(username, jwt, panelId);
+        }
+
+        /**
+         * Connects a STOMP client for a specific user.
+         */
+        function connectClient(username, jwt, panelId) {
+            const client = new StompJs.Client({
+                webSocketFactory: () => new SockJS(SOCKJS_URL),
+                connectHeaders: {
+                    'Authorization': `Bearer ${jwt}`
+                },
+                debug: (str) => { /* console.log(`[${username}] DEBUG:`, str); */ }
+            });
+
+            const statusEl = document.getElementById(`status-${username}`);
+            const messagesEl = document.getElementById(`messages-${username}`);
+            const recipientEl = document.getElementById(`recipient-${username}`);
+            const messageInputEl = document.getElementById(`message-input-${username}`);
+            const sendBtn = document.getElementById(`send-btn-${username}`);
+            const closeBtn = document.getElementById(`close-btn-${username}`);
+
+            client.onConnect = (frame) => {
+                statusEl.classList.remove('bg-yellow-400');
+                statusEl.classList.add('bg-green-500');
+                statusEl.title = 'Connected';
+                logMessage(messagesEl, `✅ System: Connected and subscribed.`, 'text-green-600');
+
+                client.subscribe('/user/queue/private', (message) => {
+                    const msgFromServer = JSON.parse(message.body);
+                    
+                    // THIS IS THE FIX: Only display the message if it's from another user.
+                    // This prevents the sender's own echoed message from appearing as a duplicate.
+                    if (msgFromServer.senderId !== username) {
+                        const displayMsg = `📩 ${msgFromServer.senderId}: ${msgFromServer.content}`;
+                        logMessage(messagesEl, displayMsg, 'text-blue-700');
+                    }
+                });
+            };
+
+            client.onStompError = (frame) => {
+                statusEl.classList.remove('bg-yellow-400');
+                statusEl.classList.add('bg-red-500');
+                statusEl.title = 'Error';
+                const errorMsg = `❌ System Error: ${frame.headers['message'] || 'Connection failed.'}`;
+                logMessage(messagesEl, errorMsg, 'text-red-600 font-bold');
+            };
+            
+            client.onDisconnect = () => {
+                logMessage(messagesEl, '🔌 System: Disconnected.', 'text-red-600');
+                statusEl.classList.remove('bg-green-500', 'bg-yellow-400', 'bg-red-500');
+                statusEl.classList.add('bg-gray-400');
+                statusEl.title = 'Disconnected';
+
+                setTimeout(() => {
+                    const panelToRemove = document.getElementById(panelId);
+                    if (panelToRemove) {
+                        panelToRemove.remove();
+                    }
+                }, 1000);
+
+                delete clients[username];
+            };
+
+            const sendMessage = () => {
+                const recipient = recipientEl.value.trim();
+                const content = messageInputEl.value.trim();
+
+                if (recipient && content) {
+                    client.publish({
+                        destination: '/app/chat/private',
+                        body: JSON.stringify({ recipientId: recipient, content: content })
+                    });
+                    logMessage(messagesEl, `🚀 You to ${recipient}: ${content}`, 'text-gray-600 text-right');
+                    messageInputEl.value = '';
+                } else {
+                    alert("Please provide a recipient and a message.");
+                }
+            };
+
+            sendBtn.addEventListener('click', sendMessage);
+            messageInputEl.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') sendMessage();
+            });
+
+            closeBtn.addEventListener('click', () => {
+                logMessage(messagesEl, '👋 System: Disconnecting...', 'text-gray-500');
+                client.deactivate();
+            });
+
+            clients[username] = client;
+            client.activate();
+        }
+
+        /**
+         * Helper to log messages to a panel's display area.
+         */
+        function logMessage(container, text, cssClass = '') {
+            const p = document.createElement('p');
+            p.textContent = text;
+            p.className = `text-sm mb-1 ${cssClass}`;
+            container.appendChild(p);
+            container.scrollTop = container.scrollHeight; // Auto-scroll to bottom
+        }
+
+    </script>
+</body>
+</html>
