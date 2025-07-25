@@ -1,6 +1,7 @@
 package com.rajeev.chat_server.config;
 
 
+import com.icptechno.security.PolicyEnforcerConfigLoader;
 import org.keycloak.adapters.authorization.integration.jakarta.ServletPolicyEnforcerFilter;
 import org.keycloak.adapters.authorization.spi.ConfigurationResolver;
 import org.keycloak.adapters.authorization.spi.HttpRequest;
@@ -19,7 +20,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-
 import java.util.Arrays;
 
 @Configuration
@@ -30,14 +30,13 @@ public class SecurityConfiguration {
     public SecurityFilterChain configure(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                // Use the corsConfigurationSource bean defined below
                 .cors(Customizer.withDefaults())
                 .addFilterAfter(createPolicyEnforcerFilter(), BearerTokenAuthenticationFilter.class)
                 .sessionManagement(s -> {
                     s.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
                 });
-
         return http.build();
-
     }
 
     private ServletPolicyEnforcerFilter createPolicyEnforcerFilter() {
@@ -49,12 +48,21 @@ public class SecurityConfiguration {
         });
     }
 
+    /**
+     * THIS IS THE FIX: Added "null" to the list of allowed origins.
+     * This tells the server to accept requests from local HTML files (file://...),
+     * which is necessary for the test client to connect.
+     */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        // In production, you should replace "null" with your actual frontend domain.
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000", "null"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Client-ID"));
+        // SockJS requires this to be true
+        configuration.setAllowCredentials(true);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -63,7 +71,6 @@ public class SecurityConfiguration {
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
-        // Configure it to use a custom converter for the principal name
         converter.setPrincipalClaimName("preferred_username");
         return converter;
     }
