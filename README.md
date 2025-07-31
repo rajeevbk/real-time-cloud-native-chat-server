@@ -1,4 +1,8 @@
-<img width="1703" height="615" alt="image" src="https://github.com/user-attachments/assets/bda96912-17aa-4172-a62e-7bfcc1c133db" />
+
+<img width="1913" height="924" alt="image" src="https://github.com/user-attachments/assets/3ffd2f3b-6b56-4bd6-b8fd-8a24feffbc3b" />
+
+<img width="1910" height="919" alt="Frame 1000000906" src="https://github.com/user-attachments/assets/3a807443-1223-4f2f-9e4c-3e5215c8c059" />
+
 
 
 
@@ -34,11 +38,18 @@ A cloud native chat server built using Java and other supporting technologies.
 - [x] Set up Cassandra integration for message persistence
 - [x] Implement WebSocket endpoints for real-time chat
 - [x] Integrate Redis for caching and pub/sub
-- [ ] Write REST APIs for user and chat management
+- [x] Write REST APIs for user and chat management
 - [ ] Write Haskell scripts for message filtering, use in Spring service
 - [ ] Create Kubernetes manifests for deployment
 - [ ] Add unit and integration tests
 - [ ] Write documentation for setup and usage
+
+## Running for Local Development
+
+- docker-compose up -d
+- Run UserServiceModuleApplication
+- Run DirectMessagingModuleApplication
+- Open client.html
 
 ---
 Feel free to contribute or suggest improvements!
