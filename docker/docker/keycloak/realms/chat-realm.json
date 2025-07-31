@@ -1,0 +1,156 @@
+{ 
+  "realm": "chat-app-realm", 
+  "id": "chat-app-realm", 
+  "enabled": true, 
+  "roles": { 
+    "realm": [ 
+      { 
+        "name": "chat_role", 
+        "description": "Standard user role for the chat application", 
+        "composite": false, 
+        "clientRole": false, 
+        "containerId": "chat-app-realm" 
+      } 
+    ] 
+  }, 
+  "clients": [ 
+    { 
+      "id": "164b0fcc-bd74-43a9-9edf-58fe0095114b",
+      "clientId": "chat-app-client",
+      "name": "suwaraksha_chat_service",
+      "description": "",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "my-super-secret-client-secret",
+      "redirectUris": [],
+      "webOrigins": [
+        "*",
+        "/*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": true,
+      "publicClient": false,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "oidc.ciba.grant.enabled": "false",
+        "client.secret.creation.time": "1752213776",
+        "backchannel.logout.session.required": "true",
+        "display.on.consent.screen": "false",
+        "oauth2.device.authorization.grant.enabled": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "protocolMappers": [ 
+        { 
+          "name": "preferred_username", 
+          "protocol": "openid-connect", 
+          "protocolMapper": "oidc-usermodel-property-mapper", 
+          "consentRequired": false, 
+          "config": { 
+            "user.attribute": "username", 
+            "claim.name": "preferred_username", 
+            "jsonType.label": "String", 
+            "access.token.claim": "true", 
+            "id.token.claim": "true" 
+          } 
+        } 
+      ]
+    } 
+  ],
+  "clientScopeMappings": {
+    "realm-management": [
+      {
+        "client": "chat-app-client",
+        "roles": ["view-users"]
+      }
+    ]
+  },
+  "users": [ 
+    {
+      "username": "service-account-chat-app-client",
+      "enabled": true,
+      "serviceAccountClientId": "chat-app-client",
+      "clientRoles": {
+        "realm-management": ["view-users"],
+        "chat-app-client": ["uma_protection"]
+      }
+    },
+    { 
+      "username": "john", 
+      "enabled": true, 
+      "firstName": "John", 
+      "lastName": "Doe", 
+      "email": "john.doe@example.com", 
+      "emailVerified": true, 
+      "attributes": { 
+        "preferred_username": ["john.doe"] 
+      }, 
+      "credentials": [ 
+        { 
+          "type": "password", 
+          "value": "password123", 
+          "temporary": false 
+        } 
+      ], 
+      "realmRoles": [ 
+        "chat_role" 
+      ] 
+    }, 
+    { 
+      "username": "jean", 
+      "enabled": true, 
+      "firstName": "Jean", 
+      "lastName": "Doe", 
+      "email": "jean.doe@example.com", 
+      "emailVerified": true, 
+      "attributes": { 
+        "preferred_username": ["jean.doe"] 
+      }, 
+      "credentials": [ 
+        { 
+          "type": "password", 
+          "value": "password123", 
+          "temporary": false 
+        } 
+      ], 
+      "realmRoles": [ 
+        "chat_role" 
+      ] 
+    }, 
+    { 
+      "username": "jane", 
+      "enabled": true, 
+      "firstName": "Jane", 
+      "lastName": "Doe", 
+      "email": "jane.doe@example.com", 
+      "emailVerified": true, 
+      "attributes": { 
+        "preferred_username": ["jane.doe"] 
+      }, 
+      "credentials": [ 
+        { 
+          "type": "password", 
+          "value": "password123", 
+          "temporary": false 
+        } 
+      ], 
+      "realmRoles": [ 
+        "chat_role" 
+      ] 
+    } 
+  ] 
+}

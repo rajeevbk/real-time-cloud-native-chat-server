@@ -3,209 +3,532 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-User Chat Client</title>
+    <title>Chat Client</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- STOMP and SockJS Libraries -->
     <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .chat-panel { transition: all 0.3s ease-in-out; }
+        #chat-container { height: calc(100vh - 4rem); }
+        .thread-item.active { background-color: #e0f2fe; }
+        .thread-item:hover { background-color: #f1f5f9; }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        .presence-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+            background-color: #9ca3af; /* Gray for offline */
+        }
+        .presence-dot.online {
+            background-color: #22c55e; /* Green for online */
+        }
+        #typing-indicator {
+            height: 1.5rem; /* Reserve space to prevent layout shift */
+        }
+        .unread-badge {
+            background-color: #ef4444; /* Red */
+            color: white;
+            font-size: 0.75rem;
+            font-weight: bold;
+            border-radius: 9999px;
+            padding: 2px 6px;
+            margin-left: auto;
+        }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="bg-gray-100">
 
-    <div class="container mx-auto p-4">
-        <header class="bg-white rounded-lg shadow p-4 mb-6 text-center">
-            <h1 class="text-2xl font-bold text-gray-700">Multi-User WebSocket Chat Client</h1>
-            <p class="text-sm text-gray-500 mt-1">Test your Spring Boot chat backend by simulating multiple users.</p>
-            <button id="addUserBtn" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-transform transform hover:scale-105">
-                + Add User Session
-            </button>
-        </header>
+<!-- Login Modal -->
+<div id="loginModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+        <h2 class="text-2xl font-bold mb-4">Login</h2>
+        <p class="mb-4 text-gray-600">Enter your Keycloak credentials to start.</p>
+        
+        <!-- Test User Details -->
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-4 rounded">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        Use one of the test users:
+                        <ul class="list-disc list-inside mt-1">
+                            <li><b>Username:</b> john</li>
+                            <li><b>Username:</b> jane</li>
+                            <li><b>Username:</b> jean</li>
+                        </ul>
+                        <b>Password (for all):</b> password123
+                    </p>
+                </div>
+            </div>
+        </div>
 
-        <main id="chatArea" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Chat panels will be dynamically added here -->
-        </main>
+        <div class="space-y-4">
+            <input type="text" id="usernameInput" class="w-full p-2 border rounded-lg" placeholder="Username (e.g., john)">
+            <input type="password" id="passwordInput" class="w-full p-2 border rounded-lg" placeholder="Password">
+        </div>
+        <button id="loginBtn" class="mt-6 w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">
+            Login
+        </button>
+        <p id="loginError" class="mt-2 text-red-500 text-sm text-center"></p>
     </div>
+</div>
 
-    <script>
-        const addUserBtn = document.getElementById('addUserBtn');
-        const chatArea = document.getElementById('chatArea');
-        const SOCKJS_URL = 'http://localhost:8081/ws-chat'; // Your server's SockJS endpoint
-        const clients = {}; // Store active client instances
+<!-- Main Chat Interface (hidden by default) -->
+<div id="app" class="hidden container mx-auto p-4">
+    <div id="chat-container" class="bg-white rounded-lg shadow-lg flex">
+        <!-- Left Panel: Threads and User Search -->
+        <div class="w-1/3 border-r border-gray-200 flex flex-col">
+            <header class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div class="flex items-center">
+                    <img id="currentUserAvatar" class="avatar w-10 h-10 rounded-full mr-3" src="">
+                    <h2 class="text-xl font-bold" id="currentUserDisplay"></h2>
+                </div>
+                <button id="logoutBtn" class="text-sm text-red-500 hover:underline">Logout</button>
+            </header>
 
-        // --- Event Listener to Add a New User ---
-        addUserBtn.addEventListener('click', () => {
-            const jwt = prompt("Please enter the JWT for the new user:");
-            if (jwt && jwt.trim() !== "") {
-                try {
-                    const decodedToken = decodeJwt(jwt);
-                    const username = decodedToken.preferred_username;
+            <div class="p-4 border-b">
+                <input id="searchInput" type="text" placeholder="Search users to start a chat..." class="w-full p-2 border rounded-lg">
+            </div>
 
-                    if (!username) {
-                        alert("Could not find 'preferred_username' in the JWT payload.");
-                        return;
-                    }
-                    if (clients[username]) {
-                        alert(`A session for user '${username}' already exists.`);
-                        return;
-                    }
+            <div id="listContainer" class="flex-grow overflow-y-auto"></div>
+        </div>
 
-                    createChatPanel(username, jwt);
-                } catch (error) {
-                    alert("Invalid JWT. Could not decode the token.");
-                    console.error("JWT Decode Error:", error);
-                }
-            }
-        });
+        <!-- Right Panel: Active Chat Window -->
+        <div id="chatWindow" class="w-2/3 flex flex-col">
+            <div id="placeholder" class="flex-grow flex items-center justify-center">
+                <div class="text-center text-gray-400">
+                    <svg class="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+                    <p class="mt-2">Select a conversation or search for a user to start chatting.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+        // --- API & Keycloak Config ---
+        const SOCKJS_URL = 'http://localhost:8081/ws-chat';
+        const USER_API_URL = 'http://localhost:8082/api/users';
+        const THREAD_API_URL = 'http://localhost:8081/api/threads';
+        const PRESENCE_API_URL = 'http://localhost:8081/api/presence';
+
+        // Updated to use the local Docker Keycloak instance
+        const KEYCLOAK_TOKEN_URL = 'http://localhost:8080/realms/chat-app-realm/protocol/openid-connect/token';
+        const KEYCLOAK_CLIENT_ID = 'chat-app-client';
+        const KEYCLOAK_CLIENT_SECRET = 'my-super-secret-client-secret';
+
+
+        // --- Global State ---
+        let stompClient = null;
+        let currentUser = { username: null, jwt: null, name: null };
+        let activeThreadId = null;
+        let onlineUsers = new Set();
+        let typingTimeout = null;
+        let activeChatRecipient = null;
+        let userDetailsCache = {};
+
+        // --- DOM Elements ---
+        const loginModal = document.getElementById('loginModal');
+        const loginBtn = document.getElementById('loginBtn');
+        const usernameInput = document.getElementById('usernameInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginError = document.getElementById('loginError');
+        const app = document.getElementById('app');
+        const currentUserDisplay = document.getElementById('currentUserDisplay');
+        const currentUserAvatar = document.getElementById('currentUserAvatar');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const listContainer = document.getElementById('listContainer');
+        const searchInput = document.getElementById('searchInput');
+        const chatWindow = document.getElementById('chatWindow');
+        const placeholder = document.getElementById('placeholder');
+
+        // --- Event Listeners ---
+        loginBtn.addEventListener('click', handleLogin);
+        logoutBtn.addEventListener('click', handleLogout);
+        searchInput.addEventListener('input', handleSearch);
 
         // --- Core Functions ---
 
-        /**
-         * Decodes a JWT to extract the payload.
-         * Note: This does NOT validate the signature. It's for client-side convenience only.
-         */
-        function decodeJwt(token) {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-            }).join(''));
-            return JSON.parse(jsonPayload);
-        }
+        async function handleLogin() {
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value.trim();
+            if (!username || !password) {
+                loginError.textContent = "Please enter a username and password.";
+                return;
+            }
+            loginError.textContent = "";
 
-        /**
-         * Creates the HTML structure and logic for a new user's chat panel.
-         */
-        function createChatPanel(username, jwt) {
-            const panelId = `panel-${username}`;
-            const panel = document.createElement('div');
-            panel.id = panelId;
-            panel.className = 'chat-panel bg-white rounded-lg shadow-lg p-4 flex flex-col h-96';
-            panel.innerHTML = `
-                <div class="flex justify-between items-center border-b pb-2 mb-2">
-                    <h2 class="text-lg font-bold">${username}</h2>
-                    <div class="flex items-center gap-2">
-                        <div id="status-${username}" class="w-4 h-4 rounded-full bg-yellow-400" title="Connecting..."></div>
-                        <button id="close-btn-${username}" class="text-red-500 hover:text-red-700 font-bold text-xl leading-none" title="Close Session">&times;</button>
-                    </div>
-                </div>
-                <div id="messages-${username}" class="flex-grow overflow-y-auto mb-2 pr-2"></div>
-                <div class="flex gap-2">
-                    <input id="recipient-${username}" type="text" placeholder="Recipient" class="w-1/3 p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <input id="message-input-${username}" type="text" placeholder="Type a message..." class="flex-grow p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                    <button id="send-btn-${username}" class="bg-green-500 hover:bg-green-600 text-white font-bold px-4 rounded-lg">Send</button>
-                </div>
-            `;
-            chatArea.appendChild(panel);
-
-            // Activate the STOMP client for this panel
-            connectClient(username, jwt, panelId);
-        }
-
-        /**
-         * Connects a STOMP client for a specific user.
-         */
-        function connectClient(username, jwt, panelId) {
-            const client = new StompJs.Client({
-                webSocketFactory: () => new SockJS(SOCKJS_URL),
-                connectHeaders: {
-                    'Authorization': `Bearer ${jwt}`
-                },
-                debug: (str) => { /* console.log(`[${username}] DEBUG:`, str); */ }
-            });
-
-            const statusEl = document.getElementById(`status-${username}`);
-            const messagesEl = document.getElementById(`messages-${username}`);
-            const recipientEl = document.getElementById(`recipient-${username}`);
-            const messageInputEl = document.getElementById(`message-input-${username}`);
-            const sendBtn = document.getElementById(`send-btn-${username}`);
-            const closeBtn = document.getElementById(`close-btn-${username}`);
-
-            client.onConnect = (frame) => {
-                statusEl.classList.remove('bg-yellow-400');
-                statusEl.classList.add('bg-green-500');
-                statusEl.title = 'Connected';
-                logMessage(messagesEl, `✅ System: Connected and subscribed.`, 'text-green-600');
-
-                client.subscribe('/user/queue/private', (message) => {
-                    const msgFromServer = JSON.parse(message.body);
-                    
-                    // THIS IS THE FIX: Only display the message if it's from another user.
-                    // This prevents the sender's own echoed message from appearing as a duplicate.
-                    if (msgFromServer.senderId !== username) {
-                        const displayMsg = `📩 ${msgFromServer.senderId}: ${msgFromServer.content}`;
-                        logMessage(messagesEl, displayMsg, 'text-blue-700');
-                    }
+            try {
+                const tokenResponse = await fetch(KEYCLOAK_TOKEN_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', },
+                    body: new URLSearchParams({
+                        'client_id': KEYCLOAK_CLIENT_ID,
+                        'client_secret': KEYCLOAK_CLIENT_SECRET,
+                        'grant_type': 'password',
+                        'username': username,
+                        'password': password
+                    })
                 });
-            };
 
-            client.onStompError = (frame) => {
-                statusEl.classList.remove('bg-yellow-400');
-                statusEl.classList.add('bg-red-500');
-                statusEl.title = 'Error';
-                const errorMsg = `❌ System Error: ${frame.headers['message'] || 'Connection failed.'}`;
-                logMessage(messagesEl, errorMsg, 'text-red-600 font-bold');
-            };
-            
-            client.onDisconnect = () => {
-                logMessage(messagesEl, '🔌 System: Disconnected.', 'text-red-600');
-                statusEl.classList.remove('bg-green-500', 'bg-yellow-400', 'bg-red-500');
-                statusEl.classList.add('bg-gray-400');
-                statusEl.title = 'Disconnected';
+                if (!tokenResponse.ok) throw new Error('Authentication failed. Please check your credentials.');
+                const tokenData = await tokenResponse.json();
+                startSession(tokenData.access_token);
+            } catch (error) {
+                console.error("Login Error:", error);
+                loginError.textContent = error.message;
+            }
+        }
 
-                setTimeout(() => {
-                    const panelToRemove = document.getElementById(panelId);
-                    if (panelToRemove) {
-                        panelToRemove.remove();
-                    }
-                }, 1000);
+        async function startSession(jwt) {
+             try {
+                const decoded = decodeJwt(jwt);
+                currentUser.username = decoded.preferred_username;
+                currentUser.jwt = jwt;
+                currentUser.name = decoded.name;
+                if (!currentUser.username) throw new Error("preferred_username not found in JWT.");
 
-                delete clients[username];
-            };
+                loginModal.classList.add('hidden');
+                app.classList.remove('hidden');
+                currentUserDisplay.textContent = currentUser.name;
+                currentUserAvatar.src = getAvatarUrl({firstName: decoded.given_name, lastName: decoded.family_name, username: currentUser.username});
+
+                await fetchInitialOnlineUsers();
+                connectWebSocket();
+                await fetchThreads();
+            } catch (error) {
+                alert("Session start failed. Invalid JWT.");
+                console.error(error);
+            }
+        }
+
+        function handleLogout() {
+            if (stompClient?.connected) {
+                sendActiveChatStatus(null);
+                stompClient.deactivate();
+            }
+            currentUser = { username: null, jwt: null, name: null };
+            activeThreadId = null;
+            onlineUsers = new Set();
+            userDetailsCache = {};
+            app.classList.add('hidden');
+            loginModal.classList.remove('hidden');
+            usernameInput.value = '';
+            passwordInput.value = '';
+            listContainer.innerHTML = '';
+            chatWindow.innerHTML = '';
+            chatWindow.appendChild(placeholder);
+        }
+
+        async function fetchInitialOnlineUsers() {
+            try {
+                const response = await fetch(`${PRESENCE_API_URL}/online`, { headers: { 'Authorization': `Bearer ${currentUser.jwt}` } });
+                const users = await response.json();
+                onlineUsers = new Set(users);
+            } catch (error) {
+                console.error("Failed to fetch online users:", error);
+            }
+        }
+
+        async function handleSearch(event) {
+            const query = event.target.value.trim();
+            if (query.length < 2) {
+                if (query.length === 0) fetchThreads();
+                return;
+            }
+            try {
+                const response = await fetch(`${USER_API_URL}/search?q=${query}`, { headers: { 'Authorization': `Bearer ${currentUser.jwt}` } });
+                const users = await response.json();
+                displaySearchResults(users);
+            } catch (error) { console.error("Search failed:", error); }
+        }
+
+        async function fetchThreads() {
+            try {
+                const response = await fetch(THREAD_API_URL, { headers: { 'Authorization': `Bearer ${currentUser.jwt}` } });
+                const threads = await response.json();
+
+                threads.forEach(thread => {
+                    thread.participants.forEach(p => {
+                        if (!userDetailsCache[p.userId]) {
+                            userDetailsCache[p.userId] = { firstName: p.firstName, lastName: p.lastName };
+                        }
+                    });
+                });
+
+                displayThreads(threads);
+            } catch (error) { console.error("Failed to fetch threads:", error); }
+        }
+
+        function displayThreads(threads) {
+            listContainer.innerHTML = '';
+            if (threads.length === 0) {
+                listContainer.innerHTML = '<p class="p-4 text-gray-500">No conversations yet.</p>';
+                return;
+            }
+            threads.forEach(thread => {
+                const otherParticipant = thread.participants.find(p => p.userId !== currentUser.username);
+                const me = thread.participants.find(p => p.userId === currentUser.username);
+                const unreadCount = me ? me.unreadCount : 0;
+
+                if (!otherParticipant) return;
+                const li = document.createElement('div');
+                li.className = 'thread-item p-4 border-b cursor-pointer flex items-center';
+                li.dataset.threadId = thread.threadId;
+                li.dataset.username = otherParticipant.userId;
+
+                const isOnline = onlineUsers.has(otherParticipant.userId);
+
+                const displayName = `${otherParticipant.firstName || ''} ${otherParticipant.lastName || otherParticipant.userId}`.trim();
+
+                li.innerHTML = `
+                    <img src="${getAvatarUrl(otherParticipant)}" class="avatar">
+                    <div class="flex-grow">
+                        <div class="font-bold">${displayName}</div>
+                        <div class="text-sm text-gray-600 truncate">${thread.lastMessageSender === currentUser.username ? 'You: ' : ''}${thread.lastMessagePreview || ''}</div>
+                    </div>
+                    ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+                `;
+                li.addEventListener('click', () => openChat(thread.threadId, otherParticipant.userId, displayName));
+                listContainer.appendChild(li);
+            });
+        }
+
+        function displaySearchResults(users) {
+            listContainer.innerHTML = '';
+            users.forEach(user => {
+                if (user.username === currentUser.username) return;
+                const li = document.createElement('div');
+                li.className = 'p-4 border-b cursor-pointer thread-item flex items-center';
+                li.dataset.username = user.username;
+                const isOnline = onlineUsers.has(user.username);
+                const displayName = `${user.firstName} ${user.lastName}`;
+                li.innerHTML = `
+                    <img src="${getAvatarUrl(user)}" class="avatar">
+                    <div class="font-bold">${displayName} (${user.username})</div>
+                `;
+                li.addEventListener('click', () => openChat(null, user.username, displayName));
+                listContainer.appendChild(li);
+            });
+        }
+
+        async function openChat(threadId, recipientId, displayName) {
+            activeThreadId = threadId;
+            activeChatRecipient = recipientId;
+
+            sendActiveChatStatus(threadId);
+
+            document.querySelectorAll('.thread-item').forEach(el => el.classList.remove('active'));
+            if (threadId) document.querySelector(`.thread-item[data-thread-id='${threadId}']`)?.classList.add('active');
+
+            chatWindow.innerHTML = `
+                <header class="p-4 border-b font-bold text-lg flex items-center">
+                    <img src="${getAvatarUrl(userDetailsCache[recipientId] || {username: recipientId})}" class="avatar">
+                    <div class="flex flex-col">
+                        <span>${displayName}</span>
+                        <span id="chat-header-presence" class="text-xs font-normal ${onlineUsers.has(recipientId) ? 'text-green-500' : 'text-gray-400'}">
+                            ${onlineUsers.has(recipientId) ? 'Online' : 'Offline'}
+                        </span>
+                    </div>
+                </header>
+                <div id="messageArea" class="flex-grow p-4 overflow-y-auto flex flex-col"></div>
+                <div id="typing-indicator" class="px-4 text-sm text-gray-500 italic"></div>
+                <footer class="p-4 border-t">
+                    <div class="flex gap-2">
+                        <input id="messageInput" type="text" placeholder="Type a message..." class="flex-grow p-2 border rounded-lg">
+                        <button id="sendBtn" class="bg-green-500 text-white font-bold px-4 rounded-lg">Send</button>
+                    </div>
+                </footer>
+            `;
+
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
 
             const sendMessage = () => {
-                const recipient = recipientEl.value.trim();
-                const content = messageInputEl.value.trim();
-
-                if (recipient && content) {
-                    client.publish({
+                const content = messageInput.value.trim();
+                if (content && recipientId) {
+                    stompClient.publish({
                         destination: '/app/chat/private',
-                        body: JSON.stringify({ recipientId: recipient, content: content })
+                        body: JSON.stringify({ recipientId, content })
                     });
-                    logMessage(messagesEl, `🚀 You to ${recipient}: ${content}`, 'text-gray-600 text-right');
-                    messageInputEl.value = '';
-                } else {
-                    alert("Please provide a recipient and a message.");
+                    displayMessage({ senderId: currentUser.username, content: content });
+                    messageInput.value = '';
+                    sendTypingStatus(recipientId, false);
                 }
             };
 
             sendBtn.addEventListener('click', sendMessage);
-            messageInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') sendMessage();
+            messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+            messageInput.addEventListener('input', () => {
+                if (!typingTimeout) {
+                    sendTypingStatus(recipientId, true);
+                }
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    sendTypingStatus(recipientId, false);
+                    typingTimeout = null;
+                }, 2000);
             });
 
-            closeBtn.addEventListener('click', () => {
-                logMessage(messagesEl, '👋 System: Disconnecting...', 'text-gray-500');
-                client.deactivate();
-            });
-
-            clients[username] = client;
-            client.activate();
+            if (threadId) {
+                markThreadAsRead(threadId);
+                try {
+                    const response = await fetch(`${THREAD_API_URL}/${threadId}/messages`, { headers: { 'Authorization': `Bearer ${currentUser.jwt}` } });
+                    const messages = await response.json();
+                    messages.reverse().forEach(msg => displayMessage(msg));
+                } catch (error) {
+                    console.error("Failed to fetch message history:", error);
+                }
+            }
         }
 
-        /**
-         * Helper to log messages to a panel's display area.
-         */
-        function logMessage(container, text, cssClass = '') {
+        async function markThreadAsRead(threadId) {
+            try {
+                await fetch(`${THREAD_API_URL}/${threadId}/read`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${currentUser.jwt}` }
+                });
+                fetchThreads();
+            } catch (error) {
+                console.error("Failed to mark thread as read:", error);
+            }
+        }
+
+        function sendActiveChatStatus(threadId) {
+            if (stompClient?.connected) {
+                stompClient.publish({
+                    destination: '/app/chat/active',
+                    body: JSON.stringify({ threadId: threadId })
+                });
+            }
+        }
+
+        function sendTypingStatus(recipientId, isTyping) {
+            if (stompClient?.connected) {
+                stompClient.publish({
+                    destination: '/app/chat/typing',
+                    body: JSON.stringify({ recipientId, typing: isTyping })
+                });
+            }
+        }
+
+        function displayMessage(message) {
+            const messageArea = document.getElementById('messageArea');
+            if (!messageArea) return;
+
+            const isMe = message.senderId === currentUser.username;
             const p = document.createElement('p');
-            p.textContent = text;
-            p.className = `text-sm mb-1 ${cssClass}`;
-            container.appendChild(p);
-            container.scrollTop = container.scrollHeight; // Auto-scroll to bottom
+            p.className = `p-2 rounded-lg max-w-xs mb-2 break-words ${isMe ? 'bg-blue-500 text-white self-end' : 'bg-gray-200 text-gray-800 self-start'}`;
+            p.textContent = message.content;
+
+            messageArea.appendChild(p);
+            messageArea.scrollTop = messageArea.scrollHeight;
         }
 
+        function connectWebSocket() {
+            stompClient = new StompJs.Client({
+                webSocketFactory: () => new SockJS(SOCKJS_URL),
+                connectHeaders: { 'Authorization': `Bearer ${currentUser.jwt}` }
+            });
+
+            stompClient.onConnect = () => {
+                console.log("WebSocket Connected!");
+                stompClient.subscribe('/user/queue/private', (message) => {
+                    const msg = JSON.parse(message.body);
+
+                    // When a message for a new chat arrives, look up the sender's
+                    // details from the cache before opening the chat window.
+                    if (activeThreadId === null && msg.senderId !== currentUser.username) {
+                        const senderDetails = userDetailsCache[msg.senderId];
+                        const displayName = senderDetails ? `${senderDetails.firstName} ${senderDetails.lastName}`.trim() : msg.senderId;
+                        openChat(msg.threadId, msg.senderId, displayName);
+                    } else if (msg.threadId === activeThreadId && msg.senderId !== currentUser.username) {
+                        displayMessage(msg);
+                    }
+
+                    fetchThreads();
+                });
+
+                stompClient.subscribe('/topic/presence', (message) => {
+                    const status = JSON.parse(message.body);
+                    if (status.online) onlineUsers.add(status.username);
+                    else onlineUsers.delete(status.username);
+                    updatePresenceIndicators();
+                });
+
+                stompClient.subscribe('/user/queue/typing', (message) => {
+                    const status = JSON.parse(message.body);
+                    const typingIndicator = document.getElementById('typing-indicator');
+
+                    if (typingIndicator && status.senderId === activeChatRecipient) {
+                        const senderDetails = userDetailsCache[status.senderId] || { firstName: status.senderId, lastName: '' };
+                        const displayName = `${senderDetails.firstName} ${senderDetails.lastName}`.trim();
+                        if (status.typing) {
+                            typingIndicator.textContent = `${displayName} is typing...`;
+                        } else {
+                            typingIndicator.textContent = '';
+                        }
+                    }
+                });
+            };
+
+            stompClient.activate();
+        }
+
+        function updatePresenceIndicators() {
+            document.querySelectorAll('.thread-item[data-username]').forEach(item => {
+                const dot = item.querySelector('.presence-dot');
+                if(dot) { // Check if dot exists before manipulating
+                    if (onlineUsers.has(item.dataset.username)) {
+                        dot.classList.add('online');
+                    } else {
+                        dot.classList.remove('online');
+                    }
+                }
+            });
+            const chatHeaderPresence = document.getElementById('chat-header-presence');
+            if (chatHeaderPresence) {
+                const statusElement = chatHeaderPresence;
+                if (onlineUsers.has(activeChatRecipient)) {
+                    statusElement.textContent = 'Online';
+                    statusElement.classList.remove('text-gray-400');
+                    statusElement.classList.add('text-green-500');
+                } else {
+                    statusElement.textContent = 'Offline';
+                    statusElement.classList.add('text-gray-400');
+                    statusElement.classList.remove('text-green-500');
+                }
+            }
+        }
+
+
+        function getAvatarUrl(user) {
+            const firstName = user.firstName || '';
+            const lastName = user.lastName || '';
+            const username = user.userId || user.username || '';
+            const initials = (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || username.substring(0, 2).toUpperCase();
+            return `https://placehold.co/40x40/EBF4FF/7F9CF5?text=${initials}`;
+        }
+
+        function decodeJwt(token) {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            return JSON.parse(jsonPayload);
+        }
     </script>
 </body>
 </html>
