@@ -17,10 +17,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
         , type = SecuritySchemeType.OPENIDCONNECT
         , in = SecuritySchemeIn.HEADER
 )
-public class Main {
+public class DirectMessagingModuleApplication {
     public static void main(String[] args) {
         try{
-            SpringApplication.run(Main.class, args);
+            SpringApplication.run(DirectMessagingModuleApplication.class, args);
         }
         catch (Exception e){
             if (isCassandraConnectionException(e)) {

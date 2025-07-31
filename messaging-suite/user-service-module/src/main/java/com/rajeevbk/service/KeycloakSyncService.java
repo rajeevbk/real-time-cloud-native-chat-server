@@ -75,8 +75,6 @@ public class KeycloakSyncService implements ApplicationRunner {
                 String userId = kcUser.getId();
 
                 Optional<User> optionalUser = userRepository.findByKcUserId(userId);
-                Set<String> roles = extractRoles(kcUser);
-                String mainRole = determineMainRole(roles);
 
                 if (optionalUser.isPresent()) {
                     User managedUser = optionalUser.get();
@@ -86,9 +84,6 @@ public class KeycloakSyncService implements ApplicationRunner {
                     managedUser.setLastName(kcUser.getLastName());
                     managedUser.setIsActive(kcUser.isEnabled());
                     managedUser.setUpdatedAt(OffsetDateTime.now());
-                    if (mainRole != null) {
-                        managedUser.setRole(mainRole);
-                    }
                 } else {
                     User newUser = new User();
                     newUser.setKcUserId(userId);
@@ -99,41 +94,17 @@ public class KeycloakSyncService implements ApplicationRunner {
                     newUser.setIsActive(kcUser.isEnabled());
                     newUser.setCreatedAt(OffsetDateTime.now());
                     newUser.setUpdatedAt(OffsetDateTime.now());
-                    newUser.setRole(mainRole != null ? mainRole : "user");
+                    newUser.setRole("user");
                     newUser.setVersion(0L);
                     userRepository.save(newUser);
                     syncedCount++;
                 }
-
             } catch (Exception e) {
                 System.err.println("Error syncing Keycloak user: " + kcUser.getUsername() + ", ID: " + kcUser.getId());
                 e.printStackTrace();
             }
         }
-
         System.out.println("Keycloak user sync completed. New users created: " + syncedCount);
     }
 
-    private Set<String> extractRoles(UserRepresentation kcUser) {
-        Set<String> roles = new HashSet<>();
-
-        if (kcUser.getRealmRoles() != null) {
-            roles.addAll(kcUser.getRealmRoles());
-        }
-
-        if (kcUser.getClientRoles() != null) {
-            kcUser.getClientRoles().forEach((clientId, clientRoleList) -> {
-                if (clientRoleList != null) {
-                    roles.addAll(clientRoleList);
-                }
-            });
-        }
-
-        return roles;
-    }
-
-    private String determineMainRole(Set<String> roles) {
-        List<String> roleHierarchy = List.of("admin", "doctor", "caregiver", "lab", "patient", "nok");
-        return roleHierarchy.stream().filter(roles::contains).findFirst().orElse(null);
-    }
 }
