@@ -46,10 +46,10 @@ A cloud native chat server built using Java and other supporting technologies.
 
 ## Running for Local Development
 
-docker-compose up -d
-Run UserServiceModuleApplication
-Run DirectMessagingModuleApplication
-Open client.html
+- docker-compose up -d
+- Run UserServiceModuleApplication
+- Run DirectMessagingModuleApplication
+- Open client.html
 
 ---
 Feel free to contribute or suggest improvements!
