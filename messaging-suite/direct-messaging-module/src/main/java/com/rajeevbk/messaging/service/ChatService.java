@@ -76,7 +76,7 @@ public class ChatService {
 
             MessageThread savedThread = redisMessageThreadRepository.save(newThread);
 
-            // THIS IS THE NEW LOGIC: Update the lookup index for both users
+            // Update the lookup index for both users
             String user1Key = "user:" + userId1 + ":threads";
             String user2Key = "user:" + userId2 + ":threads";
             redisTemplate.opsForSet().add(user1Key, threadId.toString());
@@ -104,7 +104,7 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Thread not found"));
         thread.setLastMessage(message);
         thread.setLastActivityAt(message.getTimestamp());
-        // THIS IS THE FIX: Only increment the count if the recipient is NOT viewing this specific thread.
+        //Only increment the count if the recipient is NOT viewing this specific thread.
         if (!presenceService.isUserViewingThread(recipientId, threadId)) {
             thread.getParticipants().stream()
                     .filter(p -> p.getUserId().equals(recipientId))
@@ -151,7 +151,7 @@ public class ChatService {
                 .map(Participant::getUserId)
                 .collect(Collectors.toSet());
 
-        // --- GRACEFUL DEGRADATION LOGIC ---
+        // --- Micro Service Interaction (Get First and last name from The User Service) ---
         try {
             // Try to fetch user details from the user service
             UserDetailDto[] userDetails = restTemplate.postForObject(
@@ -190,7 +190,7 @@ public class ChatService {
 
     }
 
-    // NEW: Helper method to convert entity to DTO
+    //Helper method to convert entity to DTO
     private MessageThreadDto convertToDto(MessageThread thread) {
         MessageThreadDto dto = new MessageThreadDto();
         dto.setThreadId(thread.getThreadId());
@@ -225,7 +225,7 @@ public class ChatService {
 
 
     /**
-     * NEW: Marks a thread as read for a specific user by resetting their unread count.
+     * Marks a thread as read for a specific user by resetting their unread count.
      */
     @Transactional
     public void markThreadAsRead(UUID threadId, String username) {
