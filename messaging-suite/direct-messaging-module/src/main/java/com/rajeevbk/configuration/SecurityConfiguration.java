@@ -28,6 +28,14 @@ import java.util.stream.Collectors;
 @EnableWebSecurity
 public class SecurityConfiguration {
 
+    // Define constants for the public paths
+    private static final String[] PUBLIC_PATHS = {
+            "/ws-chat/**",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
+
     @Bean
     public SecurityFilterChain configure(HttpSecurity http) throws Exception {
         http
@@ -37,7 +45,7 @@ public class SecurityConfiguration {
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
                         // Allow WebSocket connections to be upgraded
-                        .requestMatchers("/ws-chat/**").permitAll()
+                        .requestMatchers(PUBLIC_PATHS).permitAll()
                         // Secure the /api/threads endpoint, requiring the 'chat_role'
                         .requestMatchers("/api/threads/**").hasRole("chat_role")
                         .anyRequest().authenticated()
