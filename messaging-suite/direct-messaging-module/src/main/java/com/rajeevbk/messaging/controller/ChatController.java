@@ -1,4 +1,4 @@
-package com.rajeevbk.messaging.adapter;
+package com.rajeevbk.messaging.controller;
 
 import com.rajeevbk.messaging.model.Message;
 import com.rajeevbk.messaging.model.dto.ActiveChatDto;
@@ -29,12 +29,6 @@ public class ChatController {
         this.chatService = chatService;
         this.presenceService = presenceService;
     }
-
-    @PostMapping("/test/method")
-     public ResponseEntity<?> sendMessage(@RequestBody PrivateMessageDto request) {
-         // Logic to send a message
-         return ResponseEntity.ok("Success");
-     }
 
     @MessageMapping("/chat/private")
     public void sendPrivateMessage(@Payload PrivateMessageDto message, Principal principal) {

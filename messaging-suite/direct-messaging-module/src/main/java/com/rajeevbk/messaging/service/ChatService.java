@@ -36,7 +36,6 @@ public class ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatService.class);
 
-
     private final CassandraMessageRepository cassandraMessageRepository;
     private final RedisMessageThreadRepository redisMessageThreadRepository;
     private final RedisTemplate<String, String> redisTemplate;

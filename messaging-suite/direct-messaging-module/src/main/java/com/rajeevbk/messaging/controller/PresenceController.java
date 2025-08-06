@@ -1,4 +1,4 @@
-package com.rajeevbk.messaging.adapter;
+package com.rajeevbk.messaging.controller;
 
 import com.rajeevbk.messaging.service.PresenceService;
 import org.springframework.beans.factory.annotation.Autowired;

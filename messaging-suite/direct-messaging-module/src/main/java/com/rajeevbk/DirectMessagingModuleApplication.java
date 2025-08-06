@@ -19,7 +19,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 )
 public class DirectMessagingModuleApplication {
     public static void main(String[] args) {
-        try{
+        try {
             SpringApplication.run(DirectMessagingModuleApplication.class, args);
         }
         catch (Exception e){

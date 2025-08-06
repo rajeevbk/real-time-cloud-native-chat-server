@@ -1,4 +1,4 @@
-package com.rajeevbk.messaging.adapter;
+package com.rajeevbk.messaging.controller;
 
 import com.rajeevbk.messaging.model.Message;
 import com.rajeevbk.messaging.model.dto.MessageThreadDto;

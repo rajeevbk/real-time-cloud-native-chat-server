@@ -20,10 +20,5 @@ public class UserServiceModuleApplication {
     public static void main(String[] args) {
         SpringApplication.run(UserServiceModuleApplication.class, args);
     }
-
-    @PostConstruct
-    public void logProps() {
-       //Run code to Debug (e.g.. loaded DB URL)
-    }
 }
 
